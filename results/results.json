@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "model": "random",
+    "device": "cpu",
+    "torch": "2.14.0+cu130",
+    "cpu": "x86_64",
+    "threads": 1,
+    "prompt_len": 24,
+    "new_tokens": 40,
+    "pretrained_weights": false,
+    "timestamp": "2026-10-01 18:49:00"
+  },
+  "runs": [
+    {
+      "name": "naive",
+      "batch_size": 1,
+      "tokens_per_sec": 9.12523067833174,
+      "ttft_ms": 82.20758499999192,
+      "speedup_vs_naive": 1.0,
+      "weights_mb": 474.7001953125,
+      "kv_cache_mb": 0.0
+    },
+    {
+      "name": "kv_cache",
+      "batch_size": 1,
+      "tokens_per_sec": 21.98366742005217,
+      "ttft_ms": 89.24923800003626,
+      "speedup_vs_naive": 2.4091081305213855,
+      "weights_mb": 474.7001953125,
+      "kv_cache_mb": 4.5
+    },
+    {
+      "name": "int8_kv_cache",
+      "batch_size": 1,
+      "tokens_per_sec": 18.174622708247874,
+      "ttft_ms": 99.27399600002218,
+      "speedup_vs_naive": 1.9916891253395175,
+      "weights_mb": 232.0166015625,
+      "kv_cache_mb": 4.5
+    },
+    {
+      "name": "kv_cache",
+      "batch_size": 4,
+      "tokens_per_sec": 47.0862040324164,
+      "ttft_ms": 190.23993299998665,
+      "speedup_vs_naive": 5.160001504863286,
+      "weights_mb": 474.7001953125,
+      "kv_cache_mb": 18.0
+    },
+    {
+      "name": "int8_kv_cache",
+      "batch_size": 4,
+      "tokens_per_sec": 46.865337310245685,
+      "ttft_ms": 209.5227329999716,
+      "speedup_vs_naive": 5.135797544442299,
+      "weights_mb": 232.0166015625,
+      "kv_cache_mb": 18.0
+    },
+    {
+      "name": "kv_cache",
+      "batch_size": 8,
+      "tokens_per_sec": 65.70117759608343,
+      "ttft_ms": 331.6461339999819,
+      "speedup_vs_naive": 7.1999470382807695,
+      "weights_mb": 474.7001953125,
+      "kv_cache_mb": 36.0
+    },
+    {
+      "name": "int8_kv_cache",
+      "batch_size": 8,
+      "tokens_per_sec": 66.4681961088181,
+      "ttft_ms": 368.5390459999667,
+      "speedup_vs_naive": 7.28400173670675,
+      "weights_mb": 232.0166015625,
+      "kv_cache_mb": 36.0
+    }
+  ],
+  "checks": {
+    "kv_cache_matches_naive": true,
+    "batched_matches_single": true,
+    "int8_greedy_token_match": 1.0
+  },
+  "quality": {
+    "top1_agreement": 0.9386503100395203,
+    "mean_kl": 8.629452349850908e-05,
+    "perplexity_fp32": 36732.40181941017,
+    "perplexity_int8": 36777.75958879957
+  }
+}
