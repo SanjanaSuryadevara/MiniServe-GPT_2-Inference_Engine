@@ -74,12 +74,3 @@ benchmark.py    runs all modes, checks correctness, writes results/ + a chart
 tests/          pytest suite, including exact-match checks against Hugging Face GPT-2
 ```
 
-## What's next
-
-Continuous batching (admitting new requests into an in-flight batch, as vLLM's
-PagedAttention does) and 4-bit quantization are the natural next steps — left out here to
-keep a 2-week scope honest. `docs/design.md` has the reasoning behind what's included.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
