@@ -73,4 +73,4 @@ miniserve/
 benchmark.py    runs all modes, checks correctness, writes results/ + a chart
 tests/          pytest suite, including exact-match checks against Hugging Face GPT-2
 ```
-
+[dashboard](dashboard.png)
