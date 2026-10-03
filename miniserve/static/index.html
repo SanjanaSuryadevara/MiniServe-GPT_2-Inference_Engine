@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MiniServe — a GPT-2 inference engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d0e; --panel:#111617; --panel-2:#161d1e; --line:#232c2d;
+    --ink:#e7eeea; --ink-dim:#8fa29c; --amber:#ffb84d; --amber-dim:#8a6a33;
+    --cyan:#5fd3d3; --bad:#ff6b6b; --good:#6fd98f;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:env(safe-area-inset-top,0)}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding-top:env(safe-area-inset-top,0); padding-bottom:env(safe-area-inset-bottom,0);
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:42px 42px; background-position:-1px -1px;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 80px}
+  header.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px}
+  .brand{font-family:var(--mono);font-size:14px;letter-spacing:.06em;color:var(--amber)}
+  .brand b{color:var(--ink)}
+  .status{font-family:var(--mono);font-size:12px;color:var(--ink-dim);display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+  .dot.off{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+
+  h1{font-size:clamp(28px,5vw,42px);line-height:1.08;margin:18px 0 10px;font-weight:700;max-width:14ch}
+  .sub{color:var(--ink-dim);max-width:56ch;line-height:1.55;margin:0 0 36px;font-size:15px}
+  .sub code{font-family:var(--mono);color:var(--cyan);font-size:13px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:3px}
+  .panel + .panel{margin-top:22px}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .panel-head h2{font-size:13px;margin:0;font-weight:600;color:var(--ink-dim);font-family:var(--mono);letter-spacing:.04em}
+  .panel-body{padding:16px}
+
+  textarea{
+    width:100%;min-height:72px;resize:vertical;background:var(--panel-2);color:var(--ink);
+    border:1px solid var(--line);border-radius:2px;padding:12px;font-family:var(--mono);font-size:13.5px;
+    line-height:1.5;
+  }
+  textarea:focus{outline:none;border-color:var(--amber-dim)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .modes{display:flex;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+  .modes button{
+    background:var(--panel-2);color:var(--ink-dim);border:none;font-family:var(--mono);font-size:12.5px;
+    padding:8px 12px;cursor:pointer;border-right:1px solid var(--line);
+  }
+  .modes button:last-child{border-right:none}
+  .modes button.active{background:var(--amber);color:#17120a;font-weight:600}
+  .run{
+    margin-left:auto;background:var(--amber);color:#17120a;border:none;font-family:var(--mono);
+    font-weight:600;font-size:13px;padding:9px 18px;border-radius:2px;cursor:pointer;letter-spacing:.02em;
+  }
+  .run:disabled{opacity:.5;cursor:default}
+  .run:hover:not(:disabled){filter:brightness(1.08)}
+
+  .out{
+    margin-top:14px;background:#06090a;border:1px solid var(--line);border-radius:2px;padding:14px;
+    font-family:var(--mono);font-size:13.5px;line-height:1.6;color:var(--ink);min-height:48px;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .out .prompt{color:var(--ink-dim)}
+  .out .caret{display:inline-block;width:7px;height:15px;background:var(--amber);vertical-align:-2px;animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  .readout{display:flex;gap:22px;margin-top:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+  .readout b{color:var(--cyan);font-size:14px;display:block;font-family:var(--mono)}
+  .readout span{display:block;margin-top:2px}
+
+  table.bench{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
+  table.bench th{text-align:left;color:var(--ink-dim);font-weight:500;padding:6px 10px;border-bottom:1px solid var(--line);letter-spacing:.03em}
+  table.bench td{padding:7px 10px;border-bottom:1px solid var(--line)}
+  table.bench tr:last-child td{border-bottom:none}
+  .bar-cell{display:flex;align-items:center;gap:8px}
+  .bar-track{flex:1;height:7px;background:var(--panel-2);border-radius:2px;overflow:hidden;min-width:60px}
+  .bar-fill{height:100%;background:var(--amber)}
+  .bar-fill.int8{background:var(--cyan)}
+  .tag{font-size:11px;padding:1px 6px;border-radius:2px;border:1px solid var(--line);color:var(--ink-dim)}
+
+  .checks{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px}
+  .check{display:flex;align-items:center;gap:7px;color:var(--ink-dim)}
+  .check .mark{color:var(--good)}
+  .check .mark.fail{color:var(--bad)}
+
+  .arch{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line)}
+  .arch div{background:var(--panel);padding:14px;font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+  .arch div b{display:block;color:var(--ink);font-size:13px;margin-bottom:4px;font-family:var(--sans);font-weight:600}
+
+  footer{margin-top:40px;color:var(--ink-dim);font-size:12px;font-family:var(--mono);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  footer a{color:var(--cyan);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  .empty{color:var(--ink-dim);font-family:var(--mono);font-size:12.5px;padding:4px 0}
+
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f5f3ee;--panel:#ffffff;--panel-2:#f0ede6;--line:#dcd7cb;--ink:#17201d;--ink-dim:#6b7570;
+    }
+  }
+  :root[data-theme="dark"]{ --bg:#0a0d0e; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">MINI<b>SERVE</b></div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">checking engine…</span></div>
+  </header>
+
+  <h1>A GPT-2 inference engine, built from scratch.</h1>
+  <p class="sub">No <code>model.generate()</code>. The transformer forward pass, KV cache, batched decoding
+    and int8 quantization are all hand-written in PyTorch below — try it, then see what each piece buys you.</p>
+
+  <section class="panel">
+    <div class="panel-head"><h2>RUN</h2><span class="tag" id="deviceTag">—</span></div>
+    <div class="panel-body">
+      <textarea id="prompt" placeholder="Type a prompt and watch it generate…">The best way to learn how a system works is to</textarea>
+      <div class="row">
+        <div class="modes" id="modes">
+          <button data-mode="naive">naive</button>
+          <button data-mode="kv_cache" class="active">kv cache</button>
+          <button data-mode="int8">int8 + kv cache</button>
+        </div>
+        <button class="run" id="runBtn">Generate →</button>
+      </div>
+      <div class="out" id="out"><span class="empty">output will stream here</span></div>
+      <div class="readout" id="readout" style="display:none">
+        <div><b id="rTps">—</b><span>tok/s</span></div>
+        <div><b id="rTtft">—</b><span>time to first token</span></div>
+        <div><b id="rN">—</b><span>tokens generated</span></div>
+        <div><b id="rMode">—</b><span>mode</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>BENCHMARK — THROUGHPUT BY MODE &amp; BATCH SIZE</h2></div>
+    <div class="panel-body" id="benchBody">
+      <p class="empty">loading benchmark results…</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>CORRECTNESS CHECKS</h2></div>
+    <div class="panel-body">
+      <div class="checks" id="checks"><p class="empty">loading…</p></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>ARCHITECTURE</h2></div>
+    <div class="arch">
+      <div><b>Model</b>GPT-2, hand-written forward pass with F.scaled_dot_product_attention</div>
+      <div><b>KV cache</b>Pre-allocated per-layer buffers, written in place each decode step</div>
+      <div><b>Batching</b>Left-padded prompts, per-row position ids, additive attention mask</div>
+      <div><b>Quantization</b>Int8 weight-only, symmetric, per output channel</div>
+      <div><b>Serving</b>FastAPI + this static dashboard, no training-framework runtime</div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Run <code style="color:var(--cyan)">python benchmark.py</code> to regenerate these numbers.</span>
+    <span id="metaLine"></span>
+  </footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let mode = 'kv_cache';
+
+$('#modes').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  mode = b.dataset.mode;
+  document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('active', x===b));
+});
+
+async function health(){
+  try{
+    const r = await fetch('/health'); const d = await r.json();
+    $('#statusDot').classList.toggle('off', d.status !== 'ok');
+    $('#statusText').textContent = d.status === 'ok'
+      ? `engine ready · ${d.model} · ${d.device} · ${d.weights_mb} MB`
+      : 'loading model…';
+    $('#deviceTag').textContent = d.device || '—';
+    if(d.status !== 'ok') setTimeout(health, 1500);
+  }catch{
+    $('#statusDot').classList.add('off'); $('#statusText').textContent = 'engine unreachable';
+  }
+}
+
+$('#runBtn').addEventListener('click', async () => {
+  const prompt = $('#prompt').value.trim();
+  if(!prompt) return;
+  const btn = $('#runBtn'); btn.disabled = true; btn.textContent = 'generating…';
+  $('#out').innerHTML = `<span class="prompt">${esc(prompt)}</span><span class="caret"></span>`;
+  $('#readout').style.display = 'none';
+  try{
+    const r = await fetch('/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({prompt, mode, max_new_tokens: 48})
+    });
+    if(!r.ok){ const e = await r.json(); throw new Error(e.detail || r.statusText); }
+    const d = await r.json();
+    $('#out').innerHTML = `<span class="prompt">${esc(prompt)}</span>${esc(d.text.slice(prompt.length))}`;
+    $('#rTps').textContent = d.tokens_per_sec;
+    $('#rTtft').textContent = d.ttft_ms + ' ms';
+    $('#rN').textContent = d.n_generated;
+    $('#rMode').textContent = d.mode;
+    $('#readout').style.display = 'flex';
+  }catch(err){
+    $('#out').innerHTML = `<span style="color:var(--bad)">error: ${esc(err.message)}</span>`;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Generate →';
+  }
+});
+
+function esc(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function benchmark(){
+  try{
+    const r = await fetch('/benchmark');
+    if(!r.ok) throw new Error();
+    const d = await r.json();
+    renderBench(d); renderChecks(d.checks);
+    $('#metaLine').textContent = `${d.meta.model} on ${d.meta.device} · ${d.meta.timestamp}`;
+  }catch{
+    $('#benchBody').innerHTML = '<p class="empty">no results yet — run <code style="color:var(--cyan)">python benchmark.py</code></p>';
+    $('#checks').innerHTML = '<p class="empty">no results yet</p>';
+  }
+}
+
+function renderBench(d){
+  const runs = d.runs;
+  const max = Math.max(...runs.map(r => r.tokens_per_sec));
+  let rows = runs.map(r => `
+    <tr>
+      <td>${r.name}</td><td>${r.batch_size}</td>
+      <td class="bar-cell">
+        <div class="bar-track"><div class="bar-fill ${r.name==='int8_kv_cache'?'int8':''}" style="width:${(r.tokens_per_sec/max*100).toFixed(0)}%"></div></div>
+        <span>${r.tokens_per_sec.toFixed(1)}</span>
+      </td>
+      <td>${r.speedup_vs_naive.toFixed(1)}×</td>
+      <td>${r.ttft_ms.toFixed(0)} ms</td>
+    </tr>`).join('');
+  $('#benchBody').innerHTML = `
+    <table class="bench">
+      <thead><tr><th>mode</th><th>batch</th><th>tok/s</th><th>vs naive</th><th>ttft</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderChecks(c){
+  if(!c){ $('#checks').innerHTML = '<p class="empty">no results yet</p>'; return; }
+  const items = [
+    ['KV cache output == full recompute', c.kv_cache_matches_naive],
+    ['Batched output == single-prompt output', c.batched_matches_single],
+  ];
+  $('#checks').innerHTML = items.map(([label, ok]) =>
+    `<div class="check"><span class="mark ${ok?'':'fail'}">${ok?'✓':'✗'}</span>${label}</div>`
+  ).join('') + `<div class="check"><span class="mark">${(c.int8_greedy_token_match*100).toFixed(0)}%</span>int8 greedy tokens match fp32</div>`;
+}
+
+health(); benchmark();
+</script>
+</body>
+</html>
